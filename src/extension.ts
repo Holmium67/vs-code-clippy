@@ -95,17 +95,18 @@ export async function activate(context: vscode.ExtensionContext) {
       preserveFocus: true
     });
 
-    const text = `It looks like you are writing some ${source.toUpperCase()} code! But ${errors
+    const text = `It looks like you are writing some ${source.toUpperCase()} code! But: <br><ul>${errors
       .map(
         e =>
-          `${e.message
+          `<li>
+          ${e.message
             .slice(0, -1)
             .split("")
             .map((k, i) => (i === 0 ? k.toLowerCase() : k))
             .map((k, i) => (i === e.message.length && k === "." ? "" : k))
-            .join("")} on line ${e.range.start.line}`
+            .join("")} on line ${e.range.start.line}</li>`
       )
-      .join(" and ")}. You should really fix that?`;
+      .join("")}</ul><br> You should really fix that?`;
 
     //@ts-ignore
     const img = clippy.webview.asWebviewUri(onDiskPath);
