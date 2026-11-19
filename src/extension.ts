@@ -108,8 +108,8 @@ export async function activate(context: vscode.ExtensionContext) {
       )
       .join("")}</ul><br> You should really fix that?`;
 
-    //@ts-ignore
-    const img = clippy.webview.asWebviewUri(onDiskPath);
+
+    const img = clippy.webview.asWebviewUri(onDiskPath).toString();
 
     clippy.webview.html = clip(text, { img });
   };
