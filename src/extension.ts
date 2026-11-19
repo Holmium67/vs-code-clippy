@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import escapeHtml from "escape-html";
 
 const passthrough = (
   literals: TemplateStringsArray,
@@ -75,11 +76,6 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   let clippy: vscode.WebviewPanel | null;
-  const disposeOfClippy = () => {
-    if (clippy) {
-      clippy.dispose();
-    }
-  };
 
   const showClippy = ({
     source = "nice",
@@ -88,28 +84,51 @@ export async function activate(context: vscode.ExtensionContext) {
     source?: string;
     errors: vscode.Diagnostic[];
   }) => {
-    disposeOfClippy();
+    if (!clippy) {
+      clippy = vscode.window.createWebviewPanel("clippy", "Clippy", {
+        viewColumn: vscode.ViewColumn.Beside,
+        preserveFocus: true
+      });
 
-    clippy = vscode.window.createWebviewPanel("clippy", "Clippy", {
-      viewColumn: vscode.ViewColumn.Beside,
-      preserveFocus: true
-    });
+      // Let VScode handle the cleanup
+      context.subscriptions.push(clippy);
 
+      // Called when panel is closed/disposed
+      clippy.onDidDispose(() => {
+        clippy = null;
+      });
+    }
+
+    /*
+    Regex explanation
+    /(?s:\.?.$)/
+    Slashes to interpret as regex literal
+    Broken into parts to explain easier
+    (  ?s:  \.  ?  .  $  )
+    Explanation of parts
+    1 () For some reason needed to do step 2
+    2 ?s: Enable wild matching terminators
+    3 \. "\" escapes so matches "." instead of wild
+    4 ? Make previous optional (makes "." optional)
+    5 . Wild, including line terminators (see 2)
+    6 $ End of string
+    Summary: Match last character, if second to last is "." remove "."
+    For the other regex "^" is start of string
+    */
+    
     const text = `It looks like you are writing some ${source.toUpperCase()} code! But: <br><ul>${errors
       .map(
         e =>
           `<li>
-          ${e.message
-            .slice(0, -1)
-            .split("")
-            .map((k, i) => (i === 0 ? k.toLowerCase() : k))
-            .map((k, i) => (i === e.message.length && k === "." ? "" : k))
-            .join("")} on line ${e.range.start.line}</li>`
-      )
-      .join("")}</ul><br> You should really fix that?`;
+          ${
+            escapeHtml(e.message)
+            .replace(/(?s:\.?.$)/,"") // Chop last (and "." if it exists)
+            .replace(/^./, firstChar => firstChar.toLowerCase()) // Lowercase the first character
+            } on line ${e.range.start.line + 1}</li>`
+      ).join("")}</ul><br> You should really fix that?`;
 
-    //@ts-ignore
-    const img = clippy.webview.asWebviewUri(onDiskPath);
+
+    const img = clippy.webview.asWebviewUri(onDiskPath).toString();
 
     clippy.webview.html = clip(text, { img });
   };
@@ -125,12 +144,14 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      const diags = vscode.languages.getDiagnostics(uri);
-      if (diags.length < 1) {
-        disposeOfClippy();
+      const diags = vscode.languages.getDiagnostics(uri)
+        .filter(diag => diag.severity === vscode.DiagnosticSeverity.Error);
+      
+      if (diags.length < 1 && clippy) {
+        clippy.dispose();
       } else {
         showClippy({
-          source: diags[0].source,
+          source: vscode.window.activeTextEditor.document.languageId,
           errors: diags
         });
       }
