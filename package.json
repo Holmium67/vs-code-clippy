@@ -2,7 +2,7 @@
   "name": "vs-code-clippy-plus",
   "displayName": "Clippy Plus",
   "description": "Clippy Plus for VS Code",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "publisher": "Holmium67",
   "repository": {
     "type": "git",
@@ -21,6 +21,9 @@
   ],
   "main": "./out/extension.js",
   "contributes": {},
+  "dependencies": {
+    "escape-html": "^1.0.3"
+  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
@@ -28,6 +31,7 @@
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
+    "@types/escape-html": "^1.0.4",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.123.0",
     "tslint": "^5.16.0",

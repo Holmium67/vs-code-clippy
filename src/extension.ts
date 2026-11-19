@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import escapeHtml from "escape-html";
 
 const passthrough = (
   literals: TemplateStringsArray,
@@ -75,11 +76,6 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   let clippy: vscode.WebviewPanel | null;
-  const disposeOfClippy = () => {
-    if (clippy) {
-      clippy.dispose();
-    }
-  };
 
   const showClippy = ({
     source = "nice",
@@ -88,12 +84,20 @@ export async function activate(context: vscode.ExtensionContext) {
     source?: string;
     errors: vscode.Diagnostic[];
   }) => {
-    disposeOfClippy();
+    if (!clippy) {
+      clippy = vscode.window.createWebviewPanel("clippy", "Clippy", {
+        viewColumn: vscode.ViewColumn.Beside,
+        preserveFocus: true
+      });
 
-    clippy = vscode.window.createWebviewPanel("clippy", "Clippy", {
-      viewColumn: vscode.ViewColumn.Beside,
-      preserveFocus: true
-    });
+      // Let VScode handle the cleanup
+      context.subscriptions.push(clippy);
+
+      // Called when panel is closed/disposed
+      clippy.onDidDispose(() => {
+        clippy = null;
+      });
+    }
 
     /*
     Regex explanation
@@ -116,10 +120,11 @@ export async function activate(context: vscode.ExtensionContext) {
       .map(
         e =>
           `<li>
-          ${e.message
+          ${
+            escapeHtml(e.message)
             .replace(/(?s:\.?.$)/,"") // Chop last (and "." if it exists)
             .replace(/^./, firstChar => firstChar.toLowerCase()) // Lowercase the first character
-            } on line ${e.range.start.line}</li>`
+            } on line ${e.range.start.line + 1}</li>`
       ).join("")}</ul><br> You should really fix that?`;
 
 
@@ -139,12 +144,14 @@ export async function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      const diags = vscode.languages.getDiagnostics(uri);
-      if (diags.length < 1) {
-        disposeOfClippy();
+      const diags = vscode.languages.getDiagnostics(uri)
+        .filter(diag => diag.severity === vscode.DiagnosticSeverity.Error);
+      
+      if (diags.length < 1 && clippy) {
+        clippy.dispose();
       } else {
         showClippy({
-          source: diags[0].source,
+          source: vscode.window.activeTextEditor.document.languageId,
           errors: diags
         });
       }
